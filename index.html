@@ -4,6 +4,29 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>TOEIC Master</title>
+    
+    <!-- Robust Error Handler -->
+    <script>
+      window.onerror = function(msg, url, line, col, error) {
+        const root = document.getElementById('root');
+        if (root) root.removeAttribute('class'); // Remove any hiding classes
+        
+        const div = document.createElement('div');
+        div.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:white; color:#991b1b; padding:20px; z-index:9999; overflow:auto; font-family:monospace;';
+        div.innerHTML = '<h3>Application Error</h3><p><strong>Message:</strong> ' + msg + '</p><p><strong>Source:</strong> ' + (url || 'inline script') + ':' + line + '</p>';
+        document.body.appendChild(div);
+        return false;
+      };
+      
+      // Capture resource loading errors (404s for scripts)
+      window.addEventListener('error', function(e) {
+        if (e.target.tagName === 'SCRIPT') {
+          console.error('Script load failed:', e.target.src);
+          // Don't block UI for optional scripts, but log it
+        }
+      }, true);
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -42,32 +65,68 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
-    </style>
-    <script type="importmap">
-    {
-      "imports": {
-        "react-router-dom": "https://esm.sh/react-router-dom@6.22.3?deps=react@18.2.0,react-dom@18.2.0",
-        "react": "https://esm.sh/react@18.2.0",
-        "react/": "https://esm.sh/react@18.2.0/",
-        "react-dom": "https://esm.sh/react-dom@18.2.0?deps=react@18.2.0",
-        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?deps=react@18.2.0",
-        "react-dom/": "https://esm.sh/react-dom@18.2.0/",
-        "lucide-react": "https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0"
+      /* Loading State CSS */
+      #loading-indicator {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #f8fafc;
+        z-index: 50;
+        transition: opacity 0.5s;
       }
-    }
-    </script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  </head>
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #e2e8f0;
+        border-top-color: #3b82f6;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 16px;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+    
+    <!-- 
+      UMD LIBS: Critical for Preview Environment
+      Loaded synchronously to ensure window.React is available before babel scripts run.
+    -->
+    <script crossorigin="anonymous" src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin="anonymous" src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script crossorigin="anonymous" src="https://unpkg.com/history@5.3.0/umd/history.production.min.js"></script>
+    <script crossorigin="anonymous" src="https://unpkg.com/react-router@6.22.3/dist/react-router.production.min.js"></script>
+    <script crossorigin="anonymous" src="https://unpkg.com/react-router-dom@6.22.3/dist/react-router-dom.production.min.js"></script>
+    
+    <!-- Babel for on-the-fly compilation -->
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/"
+  }
+}
+</script>
+</head>
   <body>
+    <!-- Explicit Loading Container -->
+    <div id="loading-indicator">
+      <div class="spinner"></div>
+      <div style="color: #64748b; font-size: 14px; font-weight: 500;">Loading App...</div>
+    </div>
+
     <div id="root"></div>
     
-    <!-- Load scripts sequentially. Order matters! -->
-    <!-- 1. Services & Components -->
-    <script type="text/babel" data-presets="react,typescript" data-type="module" src="./services/storage.ts"></script>
-    <script type="text/babel" data-presets="react,typescript" data-type="module" src="./services/tts.ts"></script>
-    <script type="text/babel" data-presets="react,typescript" data-type="module" src="./components/Icon.tsx"></script>
-    
-    <!-- 2. Main App & Entry Point (Combines App definition and Rendering) -->
-    <script type="text/babel" data-presets="react,typescript" data-type="module" src="./App.tsx"></script>
+    <!-- Load scripts with data-presets to ensure Typescript is stripped correctly -->
+    <script type="text/babel" data-presets="react,typescript" src="./services/storage.ts"></script>
+    <script type="text/babel" data-presets="react,typescript" src="./services/tts.ts"></script>
+    <script type="text/babel" data-presets="react,typescript" src="./components/Icon.tsx"></script>
+    <script type="text/babel" data-presets="react,typescript" src="./App.tsx"></script>
   </body>
 </html>
