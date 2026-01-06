@@ -1,0 +1,503 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { HashRouter, Routes, Route, useNavigate, useLocation, Navigate, useParams } from 'react-router-dom';
+import { loadState, saveState } from './services/storage.ts';
+import { AppState, Word, GrammarNote } from './types.ts';
+import { speak } from './services/tts.ts';
+import { Icons } from './components/Icon.tsx';
+
+// --- Components ---
+
+// 1. Navigation Bar
+const BottomNav = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isVocab = location.pathname.startsWith('/vocab') || location.pathname === '/';
+  const isGrammar = location.pathname.startsWith('/grammar');
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 pb-safe pt-2 px-6 flex justify-around items-center h-16 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-50">
+      <button 
+        onClick={() => navigate('/vocab')}
+        className={`flex flex-col items-center gap-1 transition-colors ${isVocab ? 'text-primary-600' : 'text-slate-400'}`}
+      >
+        <Icons.Book size={24} strokeWidth={isVocab ? 2.5 : 2} />
+        <span className="text-[10px] font-medium">單字集</span>
+      </button>
+      
+      <div className="w-px h-6 bg-slate-200 mx-2"></div>
+
+      <button 
+        onClick={() => navigate('/grammar')}
+        className={`flex flex-col items-center gap-1 transition-colors ${isGrammar ? 'text-primary-600' : 'text-slate-400'}`}
+      >
+        <Icons.Pen size={24} strokeWidth={isGrammar ? 2.5 : 2} />
+        <span className="text-[10px] font-medium">文法筆記</span>
+      </button>
+    </div>
+  );
+};
+
+// 2. Vocabulary Home (Group Grid)
+const VocabHome: React.FC<{ words: Word[] }> = ({ words }) => {
+  const navigate = useNavigate();
+  
+  // Extract unique groups and count words
+  const groups = useMemo(() => {
+    const map = new Map<string, number>();
+    words.forEach(w => {
+      map.set(w.group, (map.get(w.group) || 0) + 1);
+    });
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]); // Sort by count desc
+  }, [words]);
+
+  return (
+    <div className="min-h-screen bg-slate-50 pb-24">
+      <header className="bg-white/80 backdrop-blur-md sticky top-0 z-10 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-slate-800 tracking-tight">我的單字</h1>
+        <button 
+          onClick={() => navigate('/add')}
+          className="bg-primary-600 text-white rounded-full p-2 shadow-lg shadow-primary-500/30 active:scale-95 transition-transform"
+        >
+          <Icons.Plus size={24} />
+        </button>
+      </header>
+
+      <div className="p-4 grid grid-cols-2 gap-4">
+        {groups.map(([groupName, count]) => (
+          <div 
+            key={groupName}
+            onClick={() => navigate(`/vocab/${encodeURIComponent(groupName)}`)}
+            className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 active:bg-slate-50 transition-colors cursor-pointer flex flex-col gap-3 h-32 justify-between"
+          >
+            <div className="bg-primary-50 w-10 h-10 rounded-full flex items-center justify-center text-primary-600">
+              <Icons.Folder size={20} />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-800 text-lg leading-tight truncate">{groupName}</h3>
+              <p className="text-slate-400 text-sm font-medium">{count} 個單字</p>
+            </div>
+          </div>
+        ))}
+        
+        {/* Empty State Suggestion */}
+        {groups.length === 0 && (
+          <div className="col-span-2 text-center py-12 text-slate-400">
+            <p>還沒有單字，點擊右上角新增！</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// 3. Word Card Component
+const WordCard: React.FC<{ word: Word }> = ({ word }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div 
+      className={`bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-300 ${expanded ? 'ring-2 ring-primary-100' : ''}`}
+      onClick={() => setExpanded(!expanded)}
+    >
+      <div className="p-4">
+        <div className="flex justify-between items-start mb-2">
+          <h3 className="text-xl font-bold text-slate-800">{word.term}</h3>
+          <div className="flex gap-2">
+            <button 
+              onClick={(e) => { e.stopPropagation(); speak(word.term, 'en'); }}
+              className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-600 active:bg-primary-100 active:text-primary-600 transition-colors"
+              title="Play English"
+            >
+              <span className="text-[10px] font-bold mr-0.5">EN</span>
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); speak(word.term, 'fr'); }}
+              className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-600 active:bg-primary-100 active:text-primary-600 transition-colors"
+              title="Play French"
+            >
+               <span className="text-[10px] font-bold mr-0.5">FR</span>
+            </button>
+          </div>
+        </div>
+        
+        {/* Preview Meaning */}
+        {!expanded && (
+           <p className="text-slate-500 text-sm truncate">{word.meaning}</p>
+        )}
+
+        {/* Expanded Content */}
+        {expanded && (
+          <div className="mt-4 pt-4 border-t border-slate-100 space-y-3 animate-fadeIn">
+            <div>
+              <span className="text-xs font-bold text-primary-600 uppercase tracking-wider">中文</span>
+              <p className="text-slate-700 font-medium text-lg">{word.meaning}</p>
+            </div>
+            {word.example && (
+              <div>
+                <span className="text-xs font-bold text-primary-600 uppercase tracking-wider">例句</span>
+                <p className="text-slate-600 italic leading-relaxed text-sm mt-1">"{word.example}"</p>
+                <button 
+                   onClick={(e) => { e.stopPropagation(); speak(word.example, 'en'); }}
+                   className="mt-2 text-xs flex items-center gap-1 text-slate-400 hover:text-primary-600"
+                >
+                  <Icons.Speaker size={12} /> 唸出例句
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// 4. Group Detail View
+const GroupDetail: React.FC<{ words: Word[] }> = ({ words }) => {
+  const { groupName } = useParams();
+  const navigate = useNavigate();
+  const decodedGroup = decodeURIComponent(groupName || '');
+
+  const groupWords = words.filter(w => w.group === decodedGroup);
+
+  return (
+    <div className="min-h-screen bg-slate-50 pb-24">
+      <header className="bg-white/80 backdrop-blur-md sticky top-0 z-10 px-4 py-4 border-b border-slate-100 flex items-center gap-4">
+        <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-slate-600 rounded-full active:bg-slate-100">
+          <Icons.Back size={24} />
+        </button>
+        <h1 className="text-xl font-bold text-slate-800 truncate">{decodedGroup}</h1>
+      </header>
+
+      <div className="p-4 space-y-4">
+        {groupWords.map(word => (
+          <WordCard key={word.id} word={word} />
+        ))}
+        {groupWords.length === 0 && (
+          <div className="text-center text-slate-400 mt-10">此群組沒有單字</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// 5. Add Word Page
+const AddWord: React.FC<{ 
+  existingGroups: string[], 
+  onAdd: (w: Omit<Word, 'id' | 'createdAt'>) => void 
+}> = ({ existingGroups, onAdd }) => {
+  const navigate = useNavigate();
+  const [term, setTerm] = useState('');
+  const [meaning, setMeaning] = useState('');
+  const [example, setExample] = useState('');
+  const [group, setGroup] = useState('');
+  const [isNewGroup, setIsNewGroup] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!term || !meaning || !group) return;
+    
+    onAdd({
+      term,
+      meaning,
+      example,
+      group
+    });
+    navigate(-1);
+  };
+
+  return (
+    <div className="min-h-screen bg-white pb-safe">
+      <header className="px-4 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+        <button onClick={() => navigate(-1)} className="text-slate-500 font-medium text-sm">取消</button>
+        <h1 className="font-bold text-slate-800">新增單字</h1>
+        <button 
+          onClick={handleSubmit}
+          disabled={!term || !meaning || !group}
+          className="text-primary-600 font-bold text-sm disabled:opacity-50"
+        >
+          完成
+        </button>
+      </header>
+
+      <div className="p-6 space-y-6">
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">單字 (Word)</label>
+          <input 
+            type="text" 
+            value={term}
+            onChange={e => setTerm(e.target.value)}
+            placeholder="Ex: Acquisition"
+            className="w-full text-2xl font-bold text-slate-800 border-b-2 border-slate-100 focus:border-primary-500 outline-none py-2 placeholder-slate-200 transition-colors"
+            autoFocus
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">中文意思 (Meaning)</label>
+          <input 
+            type="text" 
+            value={meaning}
+            onChange={e => setMeaning(e.target.value)}
+            placeholder="Ex: 收購"
+            className="w-full text-lg text-slate-800 border-b border-slate-100 focus:border-primary-500 outline-none py-2 placeholder-slate-300 transition-colors"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">群組 (Group)</label>
+          {!isNewGroup && existingGroups.length > 0 ? (
+            <div className="flex gap-2">
+              <select 
+                value={group}
+                onChange={e => {
+                  if (e.target.value === 'NEW_GROUP_TRIGGER') {
+                    setIsNewGroup(true);
+                    setGroup('');
+                  } else {
+                    setGroup(e.target.value);
+                  }
+                }}
+                className="flex-1 bg-slate-50 rounded-lg px-3 py-3 text-slate-700 outline-none border border-transparent focus:border-primary-500 appearance-none"
+              >
+                <option value="" disabled>選擇群組</option>
+                {existingGroups.map(g => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+                <option value="NEW_GROUP_TRIGGER">+ 新增群組...</option>
+              </select>
+            </div>
+          ) : (
+            <div className="flex gap-2 items-center">
+              <input 
+                type="text"
+                value={group}
+                onChange={e => setGroup(e.target.value)}
+                placeholder="輸入新群組名稱"
+                className="flex-1 bg-slate-50 rounded-lg px-3 py-3 text-slate-700 outline-none border border-primary-500"
+                autoFocus={isNewGroup}
+              />
+              {existingGroups.length > 0 && (
+                <button 
+                  onClick={() => setIsNewGroup(false)} 
+                  className="p-2 text-slate-400"
+                >
+                  <Icons.Close size={20} />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">例句 (Example)</label>
+          <textarea 
+            value={example}
+            onChange={e => setExample(e.target.value)}
+            placeholder="The company announced..."
+            rows={3}
+            className="w-full bg-slate-50 rounded-xl p-4 text-slate-700 outline-none border border-transparent focus:border-primary-500 resize-none text-base leading-relaxed"
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 6. Grammar Note List
+const GrammarHome: React.FC<{ notes: GrammarNote[] }> = ({ notes }) => {
+  const navigate = useNavigate();
+
+  return (
+    <div className="min-h-screen bg-slate-50 pb-24">
+      <header className="bg-white/80 backdrop-blur-md sticky top-0 z-10 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-slate-800 tracking-tight">文法筆記</h1>
+      </header>
+
+      <div className="p-4 grid gap-4">
+        {/* Create New Note Trigger */}
+        <div 
+          onClick={() => navigate('/grammar/new')}
+          className="bg-white rounded-xl shadow-sm border border-dashed border-slate-300 p-4 flex items-center justify-center text-slate-400 gap-2 cursor-pointer active:bg-slate-50 h-16"
+        >
+          <Icons.Plus size={20} />
+          <span className="font-medium">新增筆記</span>
+        </div>
+
+        {notes.sort((a,b) => b.updatedAt - a.updatedAt).map(note => {
+          // Extract first line as title
+          const lines = note.content.split('\n');
+          const title = lines[0] || 'Untitled';
+          const preview = lines.slice(1).join(' ').substring(0, 50) + (lines.join(' ').length > 50 ? '...' : '');
+          const date = new Date(note.updatedAt).toLocaleDateString();
+
+          return (
+            <div 
+              key={note.id}
+              onClick={() => navigate(`/grammar/${note.id}`)}
+              className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 active:bg-slate-50 transition-colors cursor-pointer"
+            >
+              <h3 className="font-bold text-slate-800 text-lg mb-1">{title}</h3>
+              <p className="text-slate-500 text-sm mb-3 h-5 overflow-hidden text-ellipsis whitespace-nowrap">{preview}</p>
+              <span className="text-xs text-slate-300 font-medium">{date}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// 7. Grammar Editor (Apple Notes Style)
+const GrammarEditor: React.FC<{ 
+  notes: GrammarNote[], 
+  onSave: (note: GrammarNote) => void,
+  onDelete: (id: string) => void 
+}> = ({ notes, onSave, onDelete }) => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  
+  const existingNote = notes.find(n => n.id === id);
+  const [content, setContent] = useState(existingNote?.content || '');
+
+  // Auto-save effect logic could go here, but keep it manual for simplicity of the prompt "ready to use"
+  const handleBack = () => {
+    if (content.trim()) {
+      onSave({
+        id: id === 'new' ? crypto.randomUUID() : id!,
+        content,
+        updatedAt: Date.now()
+      });
+    } else if (id !== 'new') {
+        // If cleared content, maybe ask to delete? For now just save empty.
+    }
+    navigate(-1);
+  };
+
+  const handleDelete = () => {
+      if(id && id !== 'new') {
+          onDelete(id);
+      }
+      navigate(-1);
+  }
+
+  return (
+    <div className="min-h-screen bg-white flex flex-col">
+      <header className="px-4 py-4 flex items-center justify-between border-b border-slate-100 sticky top-0 bg-white/90 backdrop-blur-sm z-10">
+        <button onClick={handleBack} className="flex items-center text-primary-600 font-medium">
+          <Icons.Back size={20} />
+          <span>列表</span>
+        </button>
+        {id !== 'new' && (
+             <button onClick={handleDelete} className="text-red-500 text-sm font-medium">刪除</button>
+        )}
+      </header>
+
+      <div className="flex-1 p-6">
+        <textarea
+          value={content}
+          onChange={e => setContent(e.target.value)}
+          placeholder="開始輸入文法重點..."
+          className="w-full h-full resize-none outline-none text-lg leading-relaxed text-slate-800 placeholder-slate-300"
+          autoFocus={id === 'new'}
+        />
+      </div>
+    </div>
+  );
+};
+
+
+// --- Main App Logic ---
+
+const MainApp = () => {
+  const [state, setState] = useState<AppState>(loadState);
+  
+  // Persist state changes
+  useEffect(() => {
+    saveState(state);
+  }, [state]);
+
+  const addWord = (newWord: Omit<Word, 'id' | 'createdAt'>) => {
+    const word: Word = {
+      ...newWord,
+      id: crypto.randomUUID(),
+      createdAt: Date.now()
+    };
+    setState(prev => ({ ...prev, words: [word, ...prev.words] }));
+  };
+
+  const saveNote = (note: GrammarNote) => {
+    setState(prev => {
+      const exists = prev.notes.find(n => n.id === note.id);
+      if (exists) {
+        return {
+          ...prev,
+          notes: prev.notes.map(n => n.id === note.id ? note : n)
+        };
+      } else {
+        return {
+          ...prev,
+          notes: [note, ...prev.notes]
+        };
+      }
+    });
+  };
+
+  const deleteNote = (id: string) => {
+      setState(prev => ({
+          ...prev,
+          notes: prev.notes.filter(n => n.id !== id)
+      }));
+  }
+
+  const existingGroups = useMemo(() => {
+    return Array.from(new Set(state.words.map(w => w.group))).sort();
+  }, [state.words]);
+
+  return (
+    <div className="max-w-md mx-auto min-h-screen bg-slate-50 shadow-2xl overflow-hidden relative">
+      <Routes>
+        {/* Vocabulary Routes */}
+        <Route path="/vocab" element={
+          <>
+            <VocabHome words={state.words} />
+            <BottomNav />
+          </>
+        } />
+        <Route path="/vocab/:groupName" element={
+          <>
+            <GroupDetail words={state.words} />
+            <BottomNav />
+          </>
+        } />
+        <Route path="/add" element={
+          <AddWord existingGroups={existingGroups} onAdd={addWord} />
+        } />
+
+        {/* Grammar Routes */}
+        <Route path="/grammar" element={
+          <>
+            <GrammarHome notes={state.notes} />
+            <BottomNav />
+          </>
+        } />
+        <Route path="/grammar/:id" element={
+          <GrammarEditor notes={state.notes} onSave={saveNote} onDelete={deleteNote} />
+        } />
+
+        {/* Default Redirect */}
+        <Route path="/" element={<Navigate to="/vocab" replace />} />
+      </Routes>
+    </div>
+  );
+};
+
+// Wrapped App for Router Context
+const App = () => {
+  return (
+    <HashRouter>
+      <MainApp />
+    </HashRouter>
+  );
+};
+
+export default App;

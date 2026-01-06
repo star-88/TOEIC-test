@@ -1,0 +1,5 @@
+{
+  "name": "TOEIC Master",
+  "description": "An interactive, mobile-first vocabulary and grammar notebook designed for TOEIC preparation with TTS support.",
+  "requestFramePermissions": []
+}
