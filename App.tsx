@@ -1,11 +1,16 @@
 // @ts-nocheck
 import React, { useState, useEffect, useMemo } from 'react';
-import { HashRouter, Routes, Route, useNavigate, useLocation, Navigate, useParams } from 'react-router-dom';
+import ReactDOM from 'react-dom/client';
+import * as ReactRouterDOM from 'react-router-dom';
 
-// Access global dependencies
-const { loadState, saveState } = window.TOEIC;
-const { speak } = window.TOEIC;
-const { Icons } = window.TOEIC;
+// Destructure router components defensively to handle different ESM bundle formats
+const { HashRouter, Routes, Route, useNavigate, useLocation, Navigate, useParams } = ReactRouterDOM;
+
+// Access global dependencies with safety checks
+const loadState = window.TOEIC?.loadState || (() => ({ words: [], notes: [] }));
+const saveState = window.TOEIC?.saveState || (() => {});
+const speak = window.TOEIC?.speak || (() => {});
+const Icons = window.TOEIC?.Icons || {};
 
 // --- Components ---
 
@@ -15,13 +20,17 @@ const BottomNav = () => {
   const isVocab = location.pathname.startsWith('/vocab') || location.pathname === '/';
   const isGrammar = location.pathname.startsWith('/grammar');
 
+  // Fallback for icons if they failed to load
+  const BookIcon = Icons.Book || (() => <span>Vocab</span>);
+  const PenIcon = Icons.Pen || (() => <span>Grammar</span>);
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 pb-safe pt-2 px-6 flex justify-around items-center h-16 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-50">
       <button 
         onClick={() => navigate('/vocab')}
         className={`flex flex-col items-center gap-1 transition-colors ${isVocab ? 'text-primary-600' : 'text-slate-400'}`}
       >
-        <Icons.Book size={24} strokeWidth={isVocab ? 2.5 : 2} />
+        <BookIcon size={24} strokeWidth={isVocab ? 2.5 : 2} />
         <span className="text-[10px] font-medium">單字集</span>
       </button>
       
@@ -31,7 +40,7 @@ const BottomNav = () => {
         onClick={() => navigate('/grammar')}
         className={`flex flex-col items-center gap-1 transition-colors ${isGrammar ? 'text-primary-600' : 'text-slate-400'}`}
       >
-        <Icons.Pen size={24} strokeWidth={isGrammar ? 2.5 : 2} />
+        <PenIcon size={24} strokeWidth={isGrammar ? 2.5 : 2} />
         <span className="text-[10px] font-medium">文法筆記</span>
       </button>
     </div>
@@ -40,6 +49,8 @@ const BottomNav = () => {
 
 const VocabHome = ({ words }) => {
   const navigate = useNavigate();
+  const PlusIcon = Icons.Plus || (() => <span>+</span>);
+  const FolderIcon = Icons.Folder || (() => <span>F</span>);
   
   const groups = useMemo(() => {
     const map = new Map();
@@ -57,7 +68,7 @@ const VocabHome = ({ words }) => {
           onClick={() => navigate('/add')}
           className="bg-primary-600 text-white rounded-full p-2 shadow-lg shadow-primary-500/30 active:scale-95 transition-transform"
         >
-          <Icons.Plus size={24} />
+          <PlusIcon size={24} />
         </button>
       </header>
 
@@ -69,7 +80,7 @@ const VocabHome = ({ words }) => {
             className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 active:bg-slate-50 transition-colors cursor-pointer flex flex-col gap-3 h-32 justify-between"
           >
             <div className="bg-primary-50 w-10 h-10 rounded-full flex items-center justify-center text-primary-600">
-              <Icons.Folder size={20} />
+              <FolderIcon size={20} />
             </div>
             <div>
               <h3 className="font-bold text-slate-800 text-lg leading-tight truncate">{groupName}</h3>
@@ -89,6 +100,7 @@ const VocabHome = ({ words }) => {
 
 const WordCard = ({ word }) => {
   const [expanded, setExpanded] = useState(false);
+  const SpeakerIcon = Icons.Speaker || (() => <span>Sound</span>);
 
   return (
     <div 
@@ -134,7 +146,7 @@ const WordCard = ({ word }) => {
                    onClick={(e) => { e.stopPropagation(); speak(word.example, 'en'); }}
                    className="mt-2 text-xs flex items-center gap-1 text-slate-400 hover:text-primary-600"
                 >
-                  <Icons.Speaker size={12} /> 唸出例句
+                  <SpeakerIcon size={12} /> 唸出例句
                 </button>
               </div>
             )}
@@ -149,6 +161,7 @@ const GroupDetail = ({ words }) => {
   const { groupName } = useParams();
   const navigate = useNavigate();
   const decodedGroup = decodeURIComponent(groupName || '');
+  const BackIcon = Icons.Back || (() => <span>Back</span>);
 
   const groupWords = words.filter(w => w.group === decodedGroup);
 
@@ -156,7 +169,7 @@ const GroupDetail = ({ words }) => {
     <div className="min-h-screen bg-slate-50 pb-24">
       <header className="bg-white/80 backdrop-blur-md sticky top-0 z-10 px-4 py-4 border-b border-slate-100 flex items-center gap-4">
         <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-slate-600 rounded-full active:bg-slate-100">
-          <Icons.Back size={24} />
+          <BackIcon size={24} />
         </button>
         <h1 className="text-xl font-bold text-slate-800 truncate">{decodedGroup}</h1>
       </header>
@@ -180,6 +193,7 @@ const AddWord = ({ existingGroups, onAdd }) => {
   const [example, setExample] = useState('');
   const [group, setGroup] = useState('');
   const [isNewGroup, setIsNewGroup] = useState(false);
+  const CloseIcon = Icons.Close || (() => <span>X</span>);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -270,7 +284,7 @@ const AddWord = ({ existingGroups, onAdd }) => {
                   onClick={() => setIsNewGroup(false)} 
                   className="p-2 text-slate-400"
                 >
-                  <Icons.Close size={20} />
+                  <CloseIcon size={20} />
                 </button>
               )}
             </div>
@@ -294,6 +308,7 @@ const AddWord = ({ existingGroups, onAdd }) => {
 
 const GrammarHome = ({ notes }) => {
   const navigate = useNavigate();
+  const PlusIcon = Icons.Plus || (() => <span>+</span>);
 
   return (
     <div className="min-h-screen bg-slate-50 pb-24">
@@ -306,7 +321,7 @@ const GrammarHome = ({ notes }) => {
           onClick={() => navigate('/grammar/new')}
           className="bg-white rounded-xl shadow-sm border border-dashed border-slate-300 p-4 flex items-center justify-center text-slate-400 gap-2 cursor-pointer active:bg-slate-50 h-16"
         >
-          <Icons.Plus size={20} />
+          <PlusIcon size={20} />
           <span className="font-medium">新增筆記</span>
         </div>
 
@@ -336,6 +351,7 @@ const GrammarHome = ({ notes }) => {
 const GrammarEditor = ({ notes, onSave, onDelete }) => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const BackIcon = Icons.Back || (() => <span>Back</span>);
   
   const existingNote = notes.find(n => n.id === id);
   const [content, setContent] = useState(existingNote?.content || '');
@@ -362,7 +378,7 @@ const GrammarEditor = ({ notes, onSave, onDelete }) => {
     <div className="min-h-screen bg-white flex flex-col">
       <header className="px-4 py-4 flex items-center justify-between border-b border-slate-100 sticky top-0 bg-white/90 backdrop-blur-sm z-10">
         <button onClick={handleBack} className="flex items-center text-primary-600 font-medium">
-          <Icons.Back size={20} />
+          <BackIcon size={20} />
           <span>列表</span>
         </button>
         {id !== 'new' && (
@@ -384,7 +400,7 @@ const GrammarEditor = ({ notes, onSave, onDelete }) => {
 };
 
 const MainApp = () => {
-  const [state, setState] = useState(loadState);
+  const [state, setState] = useState(loadState());
   
   useEffect(() => {
     saveState(state);
@@ -461,6 +477,7 @@ const MainApp = () => {
 };
 
 const App = () => {
+  if (!HashRouter) return <div className="p-4 text-center">Loading Library...</div>;
   return (
     <HashRouter>
       <MainApp />
@@ -468,5 +485,13 @@ const App = () => {
   );
 };
 
-// Expose to global namespace for index.tsx to use
-window.TOEIC.App = App;
+// Initialize Application
+const rootElement = document.getElementById('root');
+if (rootElement && !rootElement._reactRootContainer) {
+  const root = ReactDOM.createRoot(rootElement);
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+}
