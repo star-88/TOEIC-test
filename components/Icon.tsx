@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { 
   BookOpen, 
@@ -11,8 +12,9 @@ import {
   X
 } from 'lucide-react';
 
-// Re-exporting for easier imports
-export const Icons = {
+// Expose to global namespace
+window.TOEIC = window.TOEIC || {};
+window.TOEIC.Icons = {
   Book: BookOpen,
   Pen: PenTool,
   Plus: Plus,

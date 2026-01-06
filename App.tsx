@@ -1,13 +1,14 @@
+// @ts-nocheck
 import React, { useState, useEffect, useMemo } from 'react';
 import { HashRouter, Routes, Route, useNavigate, useLocation, Navigate, useParams } from 'react-router-dom';
-import { loadState, saveState } from './services/storage.ts';
-import { AppState, Word, GrammarNote } from './types.ts';
-import { speak } from './services/tts.ts';
-import { Icons } from './components/Icon.tsx';
+
+// Access global dependencies
+const { loadState, saveState } = window.TOEIC;
+const { speak } = window.TOEIC;
+const { Icons } = window.TOEIC;
 
 // --- Components ---
 
-// 1. Navigation Bar
 const BottomNav = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,17 +38,15 @@ const BottomNav = () => {
   );
 };
 
-// 2. Vocabulary Home (Group Grid)
-const VocabHome: React.FC<{ words: Word[] }> = ({ words }) => {
+const VocabHome = ({ words }) => {
   const navigate = useNavigate();
   
-  // Extract unique groups and count words
   const groups = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map();
     words.forEach(w => {
       map.set(w.group, (map.get(w.group) || 0) + 1);
     });
-    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]); // Sort by count desc
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
   }, [words]);
 
   return (
@@ -78,8 +77,6 @@ const VocabHome: React.FC<{ words: Word[] }> = ({ words }) => {
             </div>
           </div>
         ))}
-        
-        {/* Empty State Suggestion */}
         {groups.length === 0 && (
           <div className="col-span-2 text-center py-12 text-slate-400">
             <p>還沒有單字，點擊右上角新增！</p>
@@ -90,8 +87,7 @@ const VocabHome: React.FC<{ words: Word[] }> = ({ words }) => {
   );
 };
 
-// 3. Word Card Component
-const WordCard: React.FC<{ word: Word }> = ({ word }) => {
+const WordCard = ({ word }) => {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -120,12 +116,10 @@ const WordCard: React.FC<{ word: Word }> = ({ word }) => {
           </div>
         </div>
         
-        {/* Preview Meaning */}
         {!expanded && (
            <p className="text-slate-500 text-sm truncate">{word.meaning}</p>
         )}
 
-        {/* Expanded Content */}
         {expanded && (
           <div className="mt-4 pt-4 border-t border-slate-100 space-y-3 animate-fadeIn">
             <div>
@@ -151,8 +145,7 @@ const WordCard: React.FC<{ word: Word }> = ({ word }) => {
   );
 };
 
-// 4. Group Detail View
-const GroupDetail: React.FC<{ words: Word[] }> = ({ words }) => {
+const GroupDetail = ({ words }) => {
   const { groupName } = useParams();
   const navigate = useNavigate();
   const decodedGroup = decodeURIComponent(groupName || '');
@@ -180,11 +173,7 @@ const GroupDetail: React.FC<{ words: Word[] }> = ({ words }) => {
   );
 };
 
-// 5. Add Word Page
-const AddWord: React.FC<{ 
-  existingGroups: string[], 
-  onAdd: (w: Omit<Word, 'id' | 'createdAt'>) => void 
-}> = ({ existingGroups, onAdd }) => {
+const AddWord = ({ existingGroups, onAdd }) => {
   const navigate = useNavigate();
   const [term, setTerm] = useState('');
   const [meaning, setMeaning] = useState('');
@@ -192,7 +181,7 @@ const AddWord: React.FC<{
   const [group, setGroup] = useState('');
   const [isNewGroup, setIsNewGroup] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     if (!term || !meaning || !group) return;
     
@@ -303,8 +292,7 @@ const AddWord: React.FC<{
   );
 };
 
-// 6. Grammar Note List
-const GrammarHome: React.FC<{ notes: GrammarNote[] }> = ({ notes }) => {
+const GrammarHome = ({ notes }) => {
   const navigate = useNavigate();
 
   return (
@@ -314,7 +302,6 @@ const GrammarHome: React.FC<{ notes: GrammarNote[] }> = ({ notes }) => {
       </header>
 
       <div className="p-4 grid gap-4">
-        {/* Create New Note Trigger */}
         <div 
           onClick={() => navigate('/grammar/new')}
           className="bg-white rounded-xl shadow-sm border border-dashed border-slate-300 p-4 flex items-center justify-center text-slate-400 gap-2 cursor-pointer active:bg-slate-50 h-16"
@@ -324,7 +311,6 @@ const GrammarHome: React.FC<{ notes: GrammarNote[] }> = ({ notes }) => {
         </div>
 
         {notes.sort((a,b) => b.updatedAt - a.updatedAt).map(note => {
-          // Extract first line as title
           const lines = note.content.split('\n');
           const title = lines[0] || 'Untitled';
           const preview = lines.slice(1).join(' ').substring(0, 50) + (lines.join(' ').length > 50 ? '...' : '');
@@ -347,28 +333,20 @@ const GrammarHome: React.FC<{ notes: GrammarNote[] }> = ({ notes }) => {
   );
 };
 
-// 7. Grammar Editor (Apple Notes Style)
-const GrammarEditor: React.FC<{ 
-  notes: GrammarNote[], 
-  onSave: (note: GrammarNote) => void,
-  onDelete: (id: string) => void 
-}> = ({ notes, onSave, onDelete }) => {
+const GrammarEditor = ({ notes, onSave, onDelete }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   
   const existingNote = notes.find(n => n.id === id);
   const [content, setContent] = useState(existingNote?.content || '');
 
-  // Auto-save effect logic could go here, but keep it manual for simplicity of the prompt "ready to use"
   const handleBack = () => {
     if (content.trim()) {
       onSave({
-        id: id === 'new' ? crypto.randomUUID() : id!,
+        id: id === 'new' ? crypto.randomUUID() : id,
         content,
         updatedAt: Date.now()
       });
-    } else if (id !== 'new') {
-        // If cleared content, maybe ask to delete? For now just save empty.
     }
     navigate(-1);
   };
@@ -405,19 +383,15 @@ const GrammarEditor: React.FC<{
   );
 };
 
-
-// --- Main App Logic ---
-
 const MainApp = () => {
-  const [state, setState] = useState<AppState>(loadState);
+  const [state, setState] = useState(loadState);
   
-  // Persist state changes
   useEffect(() => {
     saveState(state);
   }, [state]);
 
-  const addWord = (newWord: Omit<Word, 'id' | 'createdAt'>) => {
-    const word: Word = {
+  const addWord = (newWord) => {
+    const word = {
       ...newWord,
       id: crypto.randomUUID(),
       createdAt: Date.now()
@@ -425,7 +399,7 @@ const MainApp = () => {
     setState(prev => ({ ...prev, words: [word, ...prev.words] }));
   };
 
-  const saveNote = (note: GrammarNote) => {
+  const saveNote = (note) => {
     setState(prev => {
       const exists = prev.notes.find(n => n.id === note.id);
       if (exists) {
@@ -442,7 +416,7 @@ const MainApp = () => {
     });
   };
 
-  const deleteNote = (id: string) => {
+  const deleteNote = (id) => {
       setState(prev => ({
           ...prev,
           notes: prev.notes.filter(n => n.id !== id)
@@ -456,7 +430,6 @@ const MainApp = () => {
   return (
     <div className="max-w-md mx-auto min-h-screen bg-slate-50 shadow-2xl overflow-hidden relative">
       <Routes>
-        {/* Vocabulary Routes */}
         <Route path="/vocab" element={
           <>
             <VocabHome words={state.words} />
@@ -472,8 +445,6 @@ const MainApp = () => {
         <Route path="/add" element={
           <AddWord existingGroups={existingGroups} onAdd={addWord} />
         } />
-
-        {/* Grammar Routes */}
         <Route path="/grammar" element={
           <>
             <GrammarHome notes={state.notes} />
@@ -483,15 +454,12 @@ const MainApp = () => {
         <Route path="/grammar/:id" element={
           <GrammarEditor notes={state.notes} onSave={saveNote} onDelete={deleteNote} />
         } />
-
-        {/* Default Redirect */}
         <Route path="/" element={<Navigate to="/vocab" replace />} />
       </Routes>
     </div>
   );
 };
 
-// Wrapped App for Router Context
 const App = () => {
   return (
     <HashRouter>
@@ -500,4 +468,5 @@ const App = () => {
   );
 };
 
-export default App;
+// Expose to global namespace for index.tsx to use
+window.TOEIC.App = App;

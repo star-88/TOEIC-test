@@ -25,6 +25,8 @@
           }
         }
       }
+      // Initialize global namespace
+      window.TOEIC = {};
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -41,7 +43,6 @@
         scrollbar-width: none;
       }
     </style>
-    <!-- Import Map for external libraries -->
     <script type="importmap">
 {
   "imports": {
@@ -54,13 +55,21 @@
   }
 }
 </script>
-    <!-- Babel for in-browser compilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   </head>
   <body>
     <div id="root"></div>
     
-    <!-- Load the application entry point -->
+    <!-- Load scripts sequentially. Order matters! -->
+    <!-- 1. Services & Components (No local dependencies) -->
+    <script type="text/babel" data-presets="react,typescript" data-type="module" src="./services/storage.ts"></script>
+    <script type="text/babel" data-presets="react,typescript" data-type="module" src="./services/tts.ts"></script>
+    <script type="text/babel" data-presets="react,typescript" data-type="module" src="./components/Icon.tsx"></script>
+    
+    <!-- 2. Main App (Depends on above) -->
+    <script type="text/babel" data-presets="react,typescript" data-type="module" src="./App.tsx"></script>
+    
+    <!-- 3. Entry Point (Mounts App) -->
     <script type="text/babel" data-presets="react,typescript" data-type="module" src="./index.tsx"></script>
   </body>
 </html>

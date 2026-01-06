@@ -1,8 +1,7 @@
-import { AppState, Word, GrammarNote } from '../types.ts';
-
+// @ts-nocheck
 const STORAGE_KEY = 'toeic-master-data-v1';
 
-const DEFAULT_STATE: AppState = {
+const DEFAULT_STATE = {
   words: [
     {
       id: '1',
@@ -46,7 +45,7 @@ const DEFAULT_STATE: AppState = {
   ]
 };
 
-export const loadState = (): AppState => {
+const loadState = () => {
   try {
     const serialized = localStorage.getItem(STORAGE_KEY);
     if (!serialized) return DEFAULT_STATE;
@@ -57,10 +56,15 @@ export const loadState = (): AppState => {
   }
 };
 
-export const saveState = (state: AppState): void => {
+const saveState = (state) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (e) {
     console.error("Failed to save state", e);
   }
 };
+
+// Expose to global namespace
+window.TOEIC = window.TOEIC || {};
+window.TOEIC.loadState = loadState;
+window.TOEIC.saveState = saveState;
