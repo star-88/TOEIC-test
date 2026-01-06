@@ -487,7 +487,9 @@ const App = () => {
 
 // Initialize Application
 const rootElement = document.getElementById('root');
-if (rootElement && !rootElement._reactRootContainer) {
+if (rootElement) {
+  // Always create a new root for simplicity in this environment.
+  // This ensures that if the script runs again (hot reload), we get a fresh render.
   const root = ReactDOM.createRoot(rootElement);
   root.render(
     <React.StrictMode>
